@@ -173,76 +173,48 @@ document.addEventListener('DOMContentLoaded', function () {
           .from(".graph-container img", { scale: 1.1, opacity: 0, duration: 1, ease: "power2.out" }, "-=0.8");
     }
 
-    // --- Utility: wait for images in an element to load ---
-    function waitForImages(el) {
-        const imgs = Array.from(el.querySelectorAll('img')).filter(img => !img.complete || img.naturalWidth === 0);
-        if (imgs.length === 0) return Promise.resolve();
-        return Promise.all(imgs.map(img => new Promise(res => {
-            img.addEventListener('load', res, { once: true });
-            img.addEventListener('error', res, { once: true }); // still resolve to not block forever
-        })));
-    }
+    // --- FIXED PDF Function ---
+    async function downloadReportAsPDF(applicantId) {
+        const applicant = applicantsData[applicantId];
+        const reportElement = document.getElementById('report-page-container');
+        if (!reportElement) return;
 
-  // --- FIXED PDF Function ---
-async function downloadReportAsPDF(applicantId) {
-    const applicant = applicantsData[applicantId];
-    const reportElement = document.getElementById('report-page-container');
-    if (!reportElement) return;
+        // Wait for images to load
+        const imgs = reportElement.querySelectorAll("img");
+        await Promise.all(Array.from(imgs).map(img => {
+            if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
+            return new Promise(res => { img.onload = res; img.onerror = res; });
+        }));
 
-    // 1. Wait for images to load
-    const imgs = reportElement.querySelectorAll("img");
-    await Promise.all(Array.from(imgs).map(img => {
-        if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
-        return new Promise(res => {
-            img.onload = res;
-            img.onerror = res;
+        // Clone node for clean snapshot
+        const clone = reportElement.cloneNode(true);
+        clone.style.opacity = "1";
+        clone.style.transform = "none";
+        clone.querySelectorAll("*").forEach(el => {
+            el.style.animation = "none";
+            el.style.transition = "none";
         });
-    }));
 
-    // 2. Clone the node so animations / opacity don’t affect capture
-    const clone = reportElement.cloneNode(true);
+        // Append off-screen
+        clone.style.position = "fixed";
+        clone.style.left = "-9999px";
+        document.body.appendChild(clone);
 
-    // force visibility
-    clone.style.opacity = "1";
-    clone.style.transform = "none";
+        // PDF options
+        const options = {
+            margin: 0.5,
+            filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, "_")}.pdf`,
+            image: { type: "jpeg", quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: "#1f2937" },
+            jsPDF: { unit: "in", format: "a4", orientation: "portrait" }
+        };
 
-    // disable animations on children
-    clone.querySelectorAll("*").forEach(el => {
-        el.style.animation = "none";
-        el.style.transition = "none";
-    });
-
-    // remove blinking cursor
-    const aiText = clone.querySelector("#ai-summary-text");
-    if (aiText) aiText.textContent = aiText.textContent;
-
-    // 3. Mount clone off-screen for correct layout
-    const wrapper = document.createElement("div");
-    wrapper.style.position = "fixed";
-    wrapper.style.left = "-9999px";
-    wrapper.style.top = "0";
-    wrapper.style.width = "210mm";   // force A4 width
-    wrapper.appendChild(clone);
-    document.body.appendChild(wrapper);
-
-    // 4. PDF options
-    const options = {
-        margin: 0.5,
-        filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, "_")}.pdf`,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#1f2937" },
-        jsPDF: { unit: "in", format: "a4", orientation: "portrait" }
-    };
-
-    // 5. Generate and clean up
-    try {
-        await html2pdf().set(options).from(wrapper).save();
-    } finally {
-        wrapper.remove();
+        try {
+            await html2pdf().set(options).from(clone).save();
+        } finally {
+            clone.remove();
+        }
     }
-}
-
-
 
     // --- Handle Report Generation Click ---
     window.handleGenerateReport = function (applicantId) {
@@ -355,12 +327,12 @@ async function downloadReportAsPDF(applicantId) {
                 const progress = this.progress();
                 if (heroParticles) {
                     const pos = heroParticles.geometry.attributes.position.array;
+                    const spread = 2; // reduced spread factor (fix distortion)
                     for (let i = 0; i < particleCount; i++) {
                         const i3 = i * 3;
-                        const dx = heroTargetPositions[i3] * (1 + progress * 5);
-                        const dy = heroTargetPositions[i3 + 1] * (1 + progress * 5);
-                        const dz = heroTargetPositions[i3 + 2] * (1 + progress * 5);
-                        pos[i3] = dx; pos[i3 + 1] = dy; pos[i3 + 2] = dz;
+                        pos[i3] = heroTargetPositions[i3] * (1 + progress * spread);
+                        pos[i3 + 1] = heroTargetPositions[i3 + 1] * (1 + progress * spread);
+                        pos[i3 + 2] = heroTargetPositions[i3 + 2] * (1 + progress * spread);
                     }
                     heroParticles.geometry.attributes.position.needsUpdate = true;
                     heroParticles.material.opacity = 1 - progress;
