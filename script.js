@@ -183,85 +183,62 @@ document.addEventListener('DOMContentLoaded', function () {
         })));
     }
 
-   // --- FIXED PDF Function (drop-in replacement) ---
+  // --- FIXED PDF Function ---
 async function downloadReportAsPDF(applicantId) {
     const applicant = applicantsData[applicantId];
     const reportElement = document.getElementById('report-page-container');
-    if (!reportElement) {
-        console.error("Report element not found.");
-        return;
-    }
+    if (!reportElement) return;
 
-    // 1) Wait for images inside the report to finish loading (otherwise html2canvas can capture blank areas)
-    const imgs = Array.from(reportElement.querySelectorAll('img'));
-    await Promise.all(imgs.map(img => {
+    // 1. Wait for images to load
+    const imgs = reportElement.querySelectorAll("img");
+    await Promise.all(Array.from(imgs).map(img => {
         if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
         return new Promise(res => {
-            img.addEventListener('load', res, { once: true });
-            img.addEventListener('error', res, { once: true }); // resolve on error to avoid hanging
+            img.onload = res;
+            img.onerror = res;
         });
     }));
 
-    // 2) Let GSAP animations/paints settle
-    await new Promise(r => setTimeout(r, 300));
-
-    // 3) Clone the report node and remove animations/transitions from the clone
+    // 2. Clone the node so animations / opacity don’t affect capture
     const clone = reportElement.cloneNode(true);
-    clone.style.opacity = '1';
-    clone.style.transition = 'none';
-    clone.style.animation = 'none';
 
-    // remove any transitions/animations on children too
-    clone.querySelectorAll('*').forEach(el => {
-        el.style.transition = 'none';
-        el.style.animation = 'none';
+    // force visibility
+    clone.style.opacity = "1";
+    clone.style.transform = "none";
+
+    // disable animations on children
+    clone.querySelectorAll("*").forEach(el => {
+        el.style.animation = "none";
+        el.style.transition = "none";
     });
 
-    // Remove pseudo-caret risk by replacing ai-summary innerHTML with text content
-    const cloneAi = clone.querySelector('#ai-summary-text');
-    if (cloneAi) cloneAi.textContent = cloneAi.textContent;
+    // remove blinking cursor
+    const aiText = clone.querySelector("#ai-summary-text");
+    if (aiText) aiText.textContent = aiText.textContent;
 
-    // 4) Create an off-screen wrapper with A4 width so html2canvas measures CSS correctly.
-    // Use '210mm' which is exact A4 width — html2canvas will use computed px values.
-    const wrapper = document.createElement('div');
-    wrapper.id = 'pdf-temp-wrapper';
-    // Keep wrapper in DOM but off-screen so styles apply
-    wrapper.style.position = 'fixed';
-    wrapper.style.left = '-9999px';
-    wrapper.style.top = '0';
-    wrapper.style.width = '210mm';         // A4 width
-    wrapper.style.boxSizing = 'border-box';
-    // Optional padding to mimic margins on page (we use html2pdf margin too)
-    wrapper.style.padding = '10mm';
-    // Background to keep dark theme if you want it printed as dark; adjust if you prefer white
-    wrapper.style.background = getComputedStyle(document.body).backgroundColor || '#0a0a0a';
-    wrapper.style.color = getComputedStyle(document.body).color || '#e2e8f0';
+    // 3. Mount clone off-screen for correct layout
+    const wrapper = document.createElement("div");
+    wrapper.style.position = "fixed";
+    wrapper.style.left = "-9999px";
+    wrapper.style.top = "0";
+    wrapper.style.width = "210mm";   // force A4 width
     wrapper.appendChild(clone);
     document.body.appendChild(wrapper);
 
-    // 5) Configure html2pdf / html2canvas options
+    // 4. PDF options
     const options = {
-        margin: 0.5, // inches
-        filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: wrapper.style.background, // use wrapper background
-            // hint to html2canvas about the virtual window width so percentage-based CSS computes properly
-            windowWidth: wrapper.getBoundingClientRect().width
-        },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        margin: 0.5,
+        filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, "_")}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#1f2937" },
+        jsPDF: { unit: "in", format: "a4", orientation: "portrait" }
     };
 
-    // 6) Generate PDF from the wrapper, then clean up the wrapper when done
+    // 5. Generate and clean up
     try {
         await html2pdf().set(options).from(wrapper).save();
-    } catch (err) {
-        console.error('html2pdf error:', err);
     } finally {
-        // cleanup DOM
-        if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+        wrapper.remove();
     }
 }
 
