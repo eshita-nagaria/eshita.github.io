@@ -183,45 +183,52 @@ document.addEventListener('DOMContentLoaded', function () {
         })));
     }
 
-    // --- FIXED PDF Function ---
-    async function downloadReportAsPDF(applicantId) {
-        const applicant = applicantsData[applicantId];
-        const reportElement = document.getElementById('report-page-container');
-        if (!reportElement) {
-            console.error("Report element not found.");
-            return;
-        }
-
-        // Ensure images & layout are ready before snapshot
-        await waitForImages(reportElement);
-
-        // Force a layout/paint cycle & let animations settle
-        await new Promise(r => setTimeout(r, 300));
-
-        // Clone to capture a static snapshot unaffected by animations / future DOM updates
-        const clone = reportElement.cloneNode(true);
-
-        // Optional: remove the blinking cursor from the clone (if present)
-        const clonedSummary = clone.querySelector('#ai-summary-text');
-        if (clonedSummary) {
-            // Replace innerHTML with text to avoid caret pseudo-element affecting render
-            clonedSummary.textContent = clonedSummary.textContent;
-        }
-
-        const options = {
-            margin: 0.5,
-            filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, '_')}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#1f2937' // keep dark theme background
-            },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-        };
-
-        html2pdf().set(options).from(clone).save();
+   // --- FIXED PDF Function ---
+async function downloadReportAsPDF(applicantId) {
+    const applicant = applicantsData[applicantId];
+    const reportElement = document.getElementById('report-page-container');
+    if (!reportElement) {
+        console.error("Report element not found.");
+        return;
     }
+
+    // --- 1. Wait for images ---
+    const imgs = reportElement.querySelectorAll("img");
+    await Promise.all(Array.from(imgs).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(res => {
+            img.onload = res;
+            img.onerror = res;
+        });
+    }));
+
+    // --- 2. Give GSAP animations time to finish ---
+    await new Promise(res => setTimeout(res, 500));
+
+    // --- 3. Clone the node for a static snapshot ---
+    const clone = reportElement.cloneNode(true);
+
+    // remove blinking cursor in clone
+    const aiText = clone.querySelector("#ai-summary-text");
+    if (aiText) {
+        aiText.textContent = aiText.textContent; // strip pseudo ::after
+    }
+
+    const options = {
+        margin: 0.5,
+        filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#1f2937' // dark bg fix
+        },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(options).from(clone).save();
+}
+
 
     // --- Handle Report Generation Click ---
     window.handleGenerateReport = function (applicantId) {
