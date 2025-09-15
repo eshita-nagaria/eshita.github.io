@@ -1,238 +1,424 @@
-// Fixed PDF download function with proper content handling
-function downloadReportAsPDF(applicantId) {
-    const applicant = applicantsData[applicantId];
-    const reportElement = document.getElementById('report-page-container');
-    
-    // Create a clone of the report element to avoid modifying the original
-    const clonedReport = reportElement.cloneNode(true);
-    
-    // Ensure all content is visible and properly sized
-    clonedReport.style.opacity = '1';
-    clonedReport.style.height = 'auto';
-    clonedReport.style.overflow = 'visible';
-    clonedReport.style.position = 'static';
-    clonedReport.style.transform = 'none';
-    
-    // Fix any elements that might be cut off
-    const allElements = clonedReport.querySelectorAll('*');
-    allElements.forEach(element => {
-        // Remove any transform animations that might interfere
-        element.style.transform = 'none';
-        element.style.opacity = '1';
-        element.style.height = 'auto';
-        element.style.overflow = 'visible';
-    });
+// COMPLETE FIX FOR PDF GENERATION ISSUES
 
-    // Temporarily add the cloned element to the document for proper rendering
-    clonedReport.style.position = 'absolute';
-    clonedReport.style.left = '-9999px';
-    clonedReport.style.top = '0';
-    clonedReport.style.width = '210mm'; // A4 width
-    document.body.appendChild(clonedReport);
-
-    const options = {
-        margin: [0.5, 0.5, 0.5, 0.5],
-        filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, '_')}.pdf`,
-        image: { 
-            type: 'jpeg', 
-            quality: 0.98 
-        },
-        html2canvas: { 
-            scale: 1, // Reduced scale to avoid memory issues
-            useCORS: true, 
-            allowTaint: true,
-            backgroundColor: '#1f2937',
-            width: 794, // A4 width in pixels at 96 DPI
-            height: null, // Let it calculate height automatically
-            scrollX: 0,
-            scrollY: 0,
-            windowWidth: 794,
-            windowHeight: window.innerHeight,
-            onrendered: function(canvas) {
-                console.log('Canvas rendered successfully');
-            }
-        },
-        jsPDF: { 
-            unit: 'mm', 
-            format: 'a4', 
-            orientation: 'portrait',
-            compress: true
-        },
-        pagebreak: { 
-            mode: ['avoid-all', 'css', 'legacy'],
-            before: '.page-break-before',
-            after: '.page-break-after'
-        }
-    };
-
-    // Generate PDF with proper error handling
-    html2pdf()
-        .from(clonedReport)
-        .set(options)
-        .toPdf()
-        .get('pdf')
-        .then(function (pdf) {
-            // Optional: Add page numbers or other enhancements
-            const totalPages = pdf.internal.getNumberOfPages();
-            console.log(`PDF generated with ${totalPages} pages`);
-        })
-        .save()
-        .then(() => {
-            console.log('PDF saved successfully');
-            // Clean up the cloned element
-            document.body.removeChild(clonedReport);
-        })
-        .catch((error) => {
-            console.error('Error generating PDF:', error);
-            // Clean up the cloned element even if there's an error
-            if (document.body.contains(clonedReport)) {
-                document.body.removeChild(clonedReport);
-            }
-            alert('Error generating PDF. Please try again.');
-        });
-}
-
-// Alternative approach: Wait for all content to load before generating PDF
-function downloadReportAsPDFAlternative(applicantId) {
-    const applicant = applicantsData[applicantId];
-    const reportElement = document.getElementById('report-page-container');
-    
-    // Wait for any animations or dynamic content to complete
-    setTimeout(() => {
-        // Ensure all images are loaded
-        const images = reportElement.querySelectorAll('img');
-        let imagesLoaded = 0;
-        const totalImages = images.length;
-        
-        if (totalImages === 0) {
-            // No images, proceed directly
-            generatePDF();
-        } else {
-            // Wait for all images to load
-            images.forEach(img => {
-                if (img.complete) {
-                    imagesLoaded++;
-                    if (imagesLoaded === totalImages) {
-                        generatePDF();
-                    }
-                } else {
-                    img.onload = () => {
-                        imagesLoaded++;
-                        if (imagesLoaded === totalImages) {
-                            generatePDF();
-                        }
-                    };
-                    img.onerror = () => {
-                        imagesLoaded++;
-                        if (imagesLoaded === totalImages) {
-                            generatePDF();
-                        }
-                    };
-                }
-            });
-        }
-        
-        function generatePDF() {
-            const options = {
-                margin: 10,
-                filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, '_')}.pdf`,
-                image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: { 
-                    scale: 2,
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: '#1f2937',
-                    logging: true,
-                    width: reportElement.scrollWidth,
-                    height: reportElement.scrollHeight
-                },
-                jsPDF: { 
-                    unit: 'mm', 
-                    format: 'a4', 
-                    orientation: 'portrait' 
-                }
-            };
-            
-            html2pdf().from(reportElement).set(options).save()
-                .then(() => {
-                    console.log('PDF generated successfully');
-                })
-                .catch((error) => {
-                    console.error('PDF generation failed:', error);
-                    alert('Failed to generate PDF. Please try again.');
-                });
-        }
-    }, 1000); // Wait 1 second for any animations to complete
-}
-
-// CSS improvements for better PDF rendering (add to your CSS)
-const pdfStyles = `
-    @media print {
-        .report-container {
+// Step 1: Add CSS styles to prevent content cutoff
+function addPDFStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        /* PDF-specific styles */
+        .pdf-container {
+            width: 210mm !important;
+            min-height: 297mm !important;
+            margin: 0 !important;
+            padding: 10mm !important;
+            box-sizing: border-box !important;
             background: white !important;
             color: black !important;
-            width: 100% !important;
-            height: auto !important;
+            font-size: 12px !important;
+            line-height: 1.4 !important;
             overflow: visible !important;
         }
         
-        .report-section {
-            page-break-inside: avoid;
-            margin-bottom: 20px !important;
+        .pdf-container * {
+            box-sizing: border-box !important;
+            max-width: 100% !important;
         }
         
-        .graph-container img {
+        .pdf-container .report-section {
+            page-break-inside: avoid !important;
+            margin-bottom: 15px !important;
+            padding: 10px !important;
+            border: 1px solid #ddd !important;
+            background: white !important;
+        }
+        
+        .pdf-container .report-section-title {
+            color: #333 !important;
+            font-size: 14px !important;
+            font-weight: bold !important;
+            margin-bottom: 10px !important;
+        }
+        
+        .pdf-container .score-box {
+            border: 2px solid #333 !important;
+            padding: 15px !important;
+            text-align: center !important;
+            margin: 10px 0 !important;
+        }
+        
+        .pdf-container .score-value {
+            font-size: 24px !important;
+            font-weight: bold !important;
+            color: #333 !important;
+        }
+        
+        .pdf-container .graph-container img {
             max-width: 100% !important;
             height: auto !important;
+            display: block !important;
+            margin: 10px auto !important;
         }
         
-        .score-box {
-            page-break-inside: avoid;
+        .pdf-container .payment-history-grid {
+            display: block !important;
         }
         
-        .payment-history-grid {
-            page-break-inside: avoid;
+        .pdf-container .info-pair {
+            display: block !important;
+            margin-bottom: 5px !important;
+            padding: 3px 0 !important;
+            border-bottom: 1px dotted #ccc !important;
         }
         
-        /* Hide buttons in PDF */
-        button {
+        .pdf-container .label {
+            font-weight: bold !important;
+            color: #333 !important;
+        }
+        
+        .pdf-container .value {
+            color: #666 !important;
+            margin-left: 10px !important;
+        }
+        
+        .pdf-container button {
             display: none !important;
         }
         
-        /* Ensure proper spacing */
-        .section {
-            margin-bottom: 30px !important;
+        .pdf-container .grid-2-col {
+            display: block !important;
         }
-    }
-`;
-
-// Inject the CSS for better PDF rendering
-function injectPDFStyles() {
-    const styleElement = document.createElement('style');
-    styleElement.textContent = pdfStyles;
-    document.head.appendChild(styleElement);
+        
+        .pdf-container .grid-2-col > div {
+            width: 100% !important;
+            margin-bottom: 15px !important;
+        }
+        
+        /* Risk color classes for PDF */
+        .pdf-container .risk-low { color: #28a745 !important; }
+        .pdf-container .risk-medium { color: #ffc107 !important; }
+        .pdf-container .risk-high { color: #dc3545 !important; }
+    `;
+    document.head.appendChild(style);
 }
 
-// Call this function when the page loads
-document.addEventListener('DOMContentLoaded', function() {
-    injectPDFStyles();
-});
-
-// Updated createDossierReport function with better PDF preparation
-function createDossierReportWithPDFSupport(applicantId) {
+// Step 2: Create a PDF-optimized version of the report
+function createPDFOptimizedReport(applicantId) {
     const applicant = applicantsData[applicantId];
     const latestRecord = applicant.history.reduce((latest, current) => 
         (current.Month_Offset > latest.Month_Offset) ? current : latest, applicant.history[0]);
     
-    // ... (keep your existing code for generating the report HTML) ...
+    const prob = latestRecord.Predicted_Prob_Default;
+    let cibilScore;
+    if (prob <= 0.15) { cibilScore = 780 + (1 - prob/0.15) * 120; } 
+    else if (prob <= 0.70) { cibilScore = 650 + (1 - (prob - 0.15)/0.55) * 130; } 
+    else { cibilScore = 300 + (1 - (prob - 0.70)/0.30) * 350; }
+    cibilScore = Math.round(cibilScore);
+
+    const riskCategory = latestRecord.Risk_Category;
+    const riskColorClass = riskCategory === 'Low' ? 'risk-low' : riskCategory === 'Medium' ? 'risk-medium' : 'risk-high';
+
+    const paymentHistoryHTML = applicant.history
+        .sort((a, b) => b.Month_Offset - a.Month_Offset)
+        .map(h => {
+            const probPercent = (h.Predicted_Prob_Default * 100).toFixed(1);
+            const historyRiskColor = h.Risk_Category === 'Low' ? 'risk-low' : h.Risk_Category === 'Medium' ? 'risk-medium' : 'risk-high';
+            return `<div class="info-pair"><span class="label">Month ${h.Month_Offset}:</span><span class="value ${historyRiskColor}">${probPercent}% (${h.Risk_Category})</span></div>`;
+        })
+        .join('');
+
+    return `
+        <div class="pdf-container">
+            <div class="report-header">
+                <h1 style="text-align: center; margin-bottom: 20px; color: #333;">RISKON™ Intelligence Report</h1>
+                <div class="report-info" style="text-align: center; margin-bottom: 30px;">
+                    <strong>Applicant ID:</strong> ${applicantId}<br>
+                    <strong>Report Date:</strong> ${new Date().toLocaleDateString('en-GB')}
+                </div>
+            </div>
+            
+            <div class="report-section">
+                <h3 class="report-section-title">Personal Details</h3>
+                <div class="report-section-content">
+                    <div class="info-pair"><span class="label">Name:</span><span class="value">${applicant.personal.name}</span></div>
+                    <div class="info-pair"><span class="label">Date of Birth:</span><span class="value">${applicant.personal.dob}</span></div>
+                    <div class="info-pair"><span class="label">Gender:</span><span class="value">${applicant.personal.gender}</span></div>
+                </div>
+            </div>
+            
+            <div class="report-section">
+                <h3 class="report-section-title">RISKON Score</h3>
+                <div class="score-box">
+                    <div class="score-value ${riskColorClass}">${cibilScore}</div>
+                    <div class="score-label">CIBIL Equivalent</div>
+                </div>
+            </div>
+            
+            <div class="report-section">
+                <h3 class="report-section-title">RISK ANALYSIS & TRACKING</h3>
+                <div class="report-section-content">
+                    <div class="graph-container">
+                        <img src="${applicant.graphImage}" alt="Risk Trend Graph for Applicant ${applicantId}">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="report-section">
+                <h3 class="report-section-title">RECENT RISK HISTORY</h3>
+                <div class="report-section-content">
+                    <div class="payment-history-grid">
+                        ${paymentHistoryHTML}
+                    </div>
+                </div>
+            </div>
+            
+            ${applicant.geminiSummary ? `
+            <div class="report-section">
+                <h3 class="report-section-title">QUICK SUMMARY</h3>
+                <div class="report-section-content">
+                    <p>${applicant.geminiSummary}</p>
+                </div>
+            </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+// Step 3: Fixed PDF download function
+function downloadReportAsPDF(applicantId) {
+    const applicant = applicantsData[applicantId];
     
-    // After setting the HTML content, prepare for PDF generation
-    reportContentWrapper.innerHTML = reportHTML;
+    // Create a temporary container
+    const tempContainer = document.createElement('div');
+    tempContainer.style.position = 'absolute';
+    tempContainer.style.left = '-9999px';
+    tempContainer.style.top = '0';
+    tempContainer.style.width = '210mm';
+    tempContainer.style.backgroundColor = 'white';
     
-    // Update the download button event listener to use the fixed function
-    document.getElementById('download-pdf-btn').addEventListener('click', () => {
-        // Use the alternative approach for better reliability
-        downloadReportAsPDFAlternative(applicantId);
-    });
+    // Add PDF-optimized content
+    tempContainer.innerHTML = createPDFOptimizedReport(applicantId);
+    document.body.appendChild(tempContainer);
     
-    // ... (rest of your existing animation code) ...
+    // Wait for images to load
+    const images = tempContainer.querySelectorAll('img');
+    let imagesLoaded = 0;
+    const totalImages = images.length;
+    
+    function checkAllImagesLoaded() {
+        if (totalImages === 0 || imagesLoaded === totalImages) {
+            generatePDF();
+        }
+    }
+    
+    if (totalImages > 0) {
+        images.forEach(img => {
+            if (img.complete && img.naturalWidth > 0) {
+                imagesLoaded++;
+                checkAllImagesLoaded();
+            } else {
+                img.onload = () => {
+                    imagesLoaded++;
+                    checkAllImagesLoaded();
+                };
+                img.onerror = () => {
+                    console.warn('Failed to load image:', img.src);
+                    imagesLoaded++;
+                    checkAllImagesLoaded();
+                };
+            }
+        });
+    } else {
+        generatePDF();
+    }
+    
+    function generatePDF() {
+        const options = {
+            margin: [5, 5, 5, 5], // top, left, bottom, right in mm
+            filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, '_')}.pdf`,
+            image: { 
+                type: 'jpeg', 
+                quality: 0.95 
+            },
+            html2canvas: { 
+                scale: 1, // Lower scale to avoid memory issues
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                width: 794, // A4 width at 96 DPI
+                height: null, // Auto height
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: 794,
+                windowHeight: window.innerHeight,
+                onrendered: function() {
+                    console.log('Canvas rendered successfully');
+                }
+            },
+            jsPDF: { 
+                unit: 'mm', 
+                format: 'a4', 
+                orientation: 'portrait',
+                compress: true
+            },
+            pagebreak: { 
+                mode: ['avoid-all', 'css', 'legacy'],
+                before: '.report-section',
+                after: '.page-break-after',
+                avoid: '.report-section'
+            }
+        };
+        
+        html2pdf()
+            .set(options)
+            .from(tempContainer)
+            .toPdf()
+            .get('pdf')
+            .then(function (pdf) {
+                const totalPages = pdf.internal.getNumberOfPages();
+                console.log(`PDF generated successfully with ${totalPages} pages`);
+                
+                // Add page numbers
+                for (let i = 1; i <= totalPages; i++) {
+                    pdf.setPage(i);
+                    pdf.setFontSize(8);
+                    pdf.setTextColor(128);
+                    pdf.text(`Page ${i} of ${totalPages}`, 200, 287, { align: 'right' });
+                }
+            })
+            .save()
+            .then(() => {
+                console.log('PDF saved successfully');
+                document.body.removeChild(tempContainer);
+            })
+            .catch((error) => {
+                console.error('Error generating PDF:', error);
+                document.body.removeChild(tempContainer);
+                alert('Error generating PDF. Please try again.');
+            });
+    }
+}
+
+// Step 4: Alternative solution using jsPDF directly (if html2pdf still fails)
+function downloadReportAsPDFAlternative(applicantId) {
+    const applicant = applicantsData[applicantId];
+    const latestRecord = applicant.history.reduce((latest, current) => 
+        (current.Month_Offset > latest.Month_Offset) ? current : latest, applicant.history[0]);
+    
+    // Create PDF using jsPDF directly
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    let yPosition = 20;
+    const pageHeight = 297;
+    const margin = 20;
+    
+    function addText(text, x = margin, fontSize = 12, style = 'normal') {
+        if (yPosition > pageHeight - 30) {
+            pdf.addPage();
+            yPosition = 20;
+        }
+        
+        pdf.setFontSize(fontSize);
+        pdf.setFont('helvetica', style);
+        pdf.text(text, x, yPosition);
+        yPosition += fontSize * 0.5;
+    }
+    
+    function addSection(title, content) {
+        yPosition += 10;
+        addText(title, margin, 16, 'bold');
+        yPosition += 5;
+        
+        if (Array.isArray(content)) {
+            content.forEach(item => {
+                addText(item, margin + 5, 11);
+            });
+        } else {
+            addText(content, margin + 5, 11);
+        }
+    }
+    
+    // Add header
+    pdf.setFontSize(20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('RISKON™ Intelligence Report', 105, 20, { align: 'center' });
+    
+    yPosition = 40;
+    addText(`Applicant ID: ${applicantId}`, margin, 12, 'bold');
+    addText(`Report Date: ${new Date().toLocaleDateString('en-GB')}`, margin, 12, 'bold');
+    
+    // Add sections
+    addSection('Personal Details', [
+        `Name: ${applicant.personal.name}`,
+        `Date of Birth: ${applicant.personal.dob}`,
+        `Gender: ${applicant.personal.gender}`
+    ]);
+    
+    const prob = latestRecord.Predicted_Prob_Default;
+    let cibilScore;
+    if (prob <= 0.15) { cibilScore = 780 + (1 - prob/0.15) * 120; } 
+    else if (prob <= 0.70) { cibilScore = 650 + (1 - (prob - 0.15)/0.55) * 130; } 
+    else { cibilScore = 300 + (1 - (prob - 0.70)/0.30) * 350; }
+    cibilScore = Math.round(cibilScore);
+    
+    addSection('RISKON Score', `CIBIL Equivalent: ${cibilScore}`);
+    
+    const historyData = applicant.history
+        .sort((a, b) => b.Month_Offset - a.Month_Offset)
+        .map(h => `Month ${h.Month_Offset}: ${(h.Predicted_Prob_Default * 100).toFixed(1)}% (${h.Risk_Category})`);
+    
+    addSection('Recent Risk History', historyData);
+    
+    if (applicant.geminiSummary) {
+        addSection('Quick Summary', applicant.geminiSummary);
+    }
+    
+    // Add page numbers
+    const totalPages = pdf.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.text(`Page ${i} of ${totalPages}`, 200, 287, { align: 'right' });
+    }
+    
+    pdf.save(`RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, '_')}.pdf`);
+}
+
+// Step 5: Initialize PDF styles when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    addPDFStyles();
+});
+
+// Step 6: Update the report creation function
+function createDossierReportFixed(applicantId) {
+    // Your existing createDossierReport function code...
+    // Just update the download button event listener:
+    
+    // After creating the report HTML and adding it to reportContentWrapper:
+    const downloadBtn = document.getElementById('download-pdf-btn');
+    if (downloadBtn) {
+        // Remove existing event listeners
+        downloadBtn.replaceWith(downloadBtn.cloneNode(true));
+        
+        // Add new event listener
+        document.getElementById('download-pdf-btn').addEventListener('click', () => {
+            // Show loading state
+            const originalText = downloadBtn.textContent;
+            downloadBtn.textContent = 'Generating PDF...';
+            downloadBtn.disabled = true;
+            
+            // Try the main method first
+            try {
+                downloadReportAsPDF(applicantId);
+            } catch (error) {
+                console.error('Main PDF method failed, trying alternative:', error);
+                downloadReportAsPDFAlternative(applicantId);
+            } finally {
+                // Reset button state after a delay
+                setTimeout(() => {
+                    downloadBtn.textContent = originalText;
+                    downloadBtn.disabled = false;
+                }, 3000);
+            }
+        });
+    }
+}
