@@ -156,31 +156,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // --- << NEWLY ADDED FUNCTION >> ---
-  function downloadReportAsPDF(applicantId) {
+   function downloadReportAsPDF(applicantId) {
     const applicant = applicantsData[applicantId];
     const reportElement = document.getElementById('report-page-container');
 
-    // Clone report to avoid UI interference
+    // Clone to avoid messing with the visible UI
     const clone = reportElement.cloneNode(true);
+
+    // ✅ Ensure full content is captured
     clone.style.opacity = "1";
     clone.style.transform = "none";
     clone.style.maxWidth = "800px";
     clone.style.background = "#1f2937";
-    clone.style.overflow = "visible";
-    clone.style.height = "auto";
-    clone.style.maxHeight = "none";
-
-    // --- STEP 1: Replace GIFs with PNG snapshots ---
-    const gifs = clone.querySelectorAll("img[src$='.gif']");
-    gifs.forEach(img => {
-        // Build fallback path from applicant data
-        let fallback = applicant.graphImage.replace(".gif", "_snapshot.png");
-        img.src = fallback;
-    });
+    clone.style.overflow = "visible";     // allow content to expand
+    clone.style.height = "auto";          // no fixed heights
+    clone.style.maxHeight = "none";       // remove height limits
 
     document.body.appendChild(clone);
 
-    // --- STEP 2: Wait for all images to load ---
+    // Wait for images (graphs, logos, etc.)
     const images = clone.querySelectorAll("img");
     const promises = Array.from(images).map(img => {
         if (img.complete) return Promise.resolve();
@@ -197,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function () {
             pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
         };
         html2pdf().from(clone).set(options).save().then(() => {
-            document.body.removeChild(clone);
+            document.body.removeChild(clone); // cleanup
         });
     });
 }
