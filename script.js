@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>`;
         
         reportContentWrapper.innerHTML = reportHTML;
-        document.getElementById('download-pdf-btn').addEventListener('click', () => (applicantId));
+       document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReportAsPDF(applicantId));
 
         const tl = gsap.timeline();
         const scoreCounter = { value: 300 };
