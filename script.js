@@ -195,6 +195,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+
     // --- Handle Report Generation Click ---
     window.handleGenerateReport = function(applicantId) {
         const applicant = applicantsData[applicantId];
