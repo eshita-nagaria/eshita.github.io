@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>`;
         
         reportContentWrapper.innerHTML = reportHTML;
-        document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReportAsPDF(applicantId));
+        document.getElementById('download-pdf-btn').addEventListener('click', () => (applicantId));
 
         const tl = gsap.timeline();
         const scoreCounter = { value: 300 };
@@ -160,21 +160,19 @@ document.addEventListener('DOMContentLoaded', function () {
     const applicant = applicantsData[applicantId];
     const reportElement = document.getElementById('report-page-container');
 
-    // Clone to avoid messing with the visible UI
     const clone = reportElement.cloneNode(true);
-
-    // ✅ Ensure full content is captured
     clone.style.opacity = "1";
     clone.style.transform = "none";
-    clone.style.maxWidth = "800px";
-    clone.style.background = "#1f2937";
-    clone.style.overflow = "visible";     // allow content to expand
-    clone.style.height = "auto";          // no fixed heights
-    clone.style.maxHeight = "none";       // remove height limits
+
+    // ✅ Replace GIF with PNG in cloned report
+    const graphImg = clone.querySelector(".graph-container img");
+    if (graphImg && graphImg.src.endsWith(".gif")) {
+        // Replace only in the PDF version
+        graphImg.src = applicant.graphImage.replace(".gif", "_snapshot.png");
+    }
 
     document.body.appendChild(clone);
 
-    // Wait for images (graphs, logos, etc.)
     const images = clone.querySelectorAll("img");
     const promises = Array.from(images).map(img => {
         if (img.complete) return Promise.resolve();
@@ -187,14 +185,14 @@ document.addEventListener('DOMContentLoaded', function () {
             filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, '_')}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, backgroundColor: "#1f2937", scrollY: 0 },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
         };
         html2pdf().from(clone).set(options).save().then(() => {
-            document.body.removeChild(clone); // cleanup
+            document.body.removeChild(clone);
         });
     });
 }
+
 
 
     // --- Handle Report Generation Click ---
