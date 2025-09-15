@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const riskCategory = latestRecord.Risk_Category;
         const riskColorClass = riskCategory === 'Low' ? 'risk-low' : riskCategory === 'Medium' ? 'risk-medium' : 'risk-high';
 
+        // This section uses the correct data (probability and risk category)
         const paymentHistoryHTML = applicant.history
             .sort((a, b) => b.Month_Offset - a.Month_Offset)
             .map(h => {
@@ -118,6 +119,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <div class="report-generation-section">
                      <button id="generate-report-btn" onclick="handleGenerateReport('${applicantId}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 flex items-center mx-auto">
+                        <svg class="w-6 h-6 mr-2" viewBox="0 0 24 24"><path fill="currentColor" d="M12,1.75A10.25,10.25,0,0,0,1.75,12A10.25,10.25,0,0,0,12,22.25A10.25,10.25,0,0,0,22.25,12A10.25,10.25,0,0,0,12,1.75ZM9.25,6a1.5,1.5,0,1,1-1.5,1.5A1.5,1.5,0,0,1,9.25,6Zm6,12a1.5,1.5,0,1,1,1.5-1.5A1.5,1.5,0,0,1,15.25,18Zm-2-6a1.5,1.5,0,1,1-1.5,1.5A1.5,1.5,0,0,1,13.25,12Z"/></svg>
                         Generate Quick Summary
                     </button>
                     <div id="ai-summary-container" class="hidden mt-6">
@@ -135,12 +137,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>`;
         
         reportContentWrapper.innerHTML = reportHTML;
-
-        // ✅ Always re-bind the download button
-        setTimeout(() => {
-            const dlBtn = document.getElementById('download-pdf-btn');
-            if (dlBtn) dlBtn.addEventListener('click', () => downloadReportAsPDF(applicantId));
-        }, 200);
+        document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReportAsPDF(applicantId));
 
         const tl = gsap.timeline();
         const scoreCounter = { value: 300 };
@@ -158,46 +155,43 @@ document.addEventListener('DOMContentLoaded', function () {
           .from(".graph-container img", { scale: 1.1, opacity: 0, duration: 1, ease: "power2.out" }, "-=0.8");
     }
 
-    // --- FIXED PDF DOWNLOAD ---
-    function downloadReportAsPDF(applicantId) {
-        const applicant = applicantsData[applicantId];
-        const reportElement = document.getElementById('report-page-container');
+    // --- << NEWLY ADDED FUNCTION >> ---
+    // --- FIXED PDF DOWNLOAD FUNCTION ---
+function downloadReportAsPDF(applicantId) {
+    const applicant = applicantsData[applicantId];
+    const reportElement = document.getElementById('report-page-container');
 
-        const clone = reportElement.cloneNode(true);
-        clone.style.opacity = "1";
-        clone.style.transform = "none";
-        clone.style.position = "absolute";
-        clone.style.left = "-9999px"; // hide off-screen but keep layout
+    // Clone the report to avoid messing with visible DOM
+    const clone = reportElement.cloneNode(true);
+    clone.style.opacity = "1";  // ensure fully visible
+    clone.style.transform = "none"; // remove gsap transforms
+    clone.style.maxWidth = "800px"; // keep layout consistent
+    clone.style.background = "#1f2937"; // dark background fix
+    document.body.appendChild(clone); // temporarily add to DOM
 
-        // Replace GIF → PNG for PDF snapshot
-        const graphImg = clone.querySelector(".graph-container img");
-        if (graphImg && graphImg.src.includes(".gif")) {
-            graphImg.src = applicant.graphImage.replace(".gif", "_snapshot.png");
-        }
+    // Wait until all images (like graphs) are loaded
+    const images = clone.querySelectorAll("img");
+    const promises = Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+    });
 
-        document.body.appendChild(clone);
-
-        const images = clone.querySelectorAll("img");
-        const promises = Array.from(images).map(img => {
-            if (img.complete) return Promise.resolve();
-            return new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+    Promise.all(promises).then(() => {
+        const options = {
+            margin: 0.2,
+            filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, '_')}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: "#1f2937" },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+        html2pdf().from(clone).set(options).save().then(() => {
+            document.body.removeChild(clone); // cleanup after save
         });
+    });
+}
 
-        Promise.all(promises).then(() => {
-            const options = {
-                margin: 0.2,
-                filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, '_')}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, backgroundColor: "#1f2937" },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-            };
-            html2pdf().from(clone).set(options).save().then(() => {
-                document.body.removeChild(clone);
-            });
-        });
-    }
-
-    // --- Handle Report Generation ---
+    // --- Handle Report Generation Click ---
     window.handleGenerateReport = function(applicantId) {
         const applicant = applicantsData[applicantId];
         const summaryContainer = document.getElementById('ai-summary-container');
@@ -224,10 +218,6 @@ document.addEventListener('DOMContentLoaded', function () {
             typeWriter();
         }, 800);
     }
-
-    
-});
-
 
     // --- Landing Page Animations (No changes needed here) ---
     let heroScene, heroCamera, heroRenderer, heroParticles;
