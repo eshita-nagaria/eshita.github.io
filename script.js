@@ -156,20 +156,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // --- << NEWLY ADDED FUNCTION >> ---
-    // --- FIXED PDF DOWNLOAD FUNCTION ---
-function downloadReportAsPDF(applicantId) {
+   function downloadReportAsPDF(applicantId) {
     const applicant = applicantsData[applicantId];
     const reportElement = document.getElementById('report-page-container');
 
-    // Clone the report to avoid messing with visible DOM
+    // Clone to avoid messing with the visible UI
     const clone = reportElement.cloneNode(true);
-    clone.style.opacity = "1";  // ensure fully visible
-    clone.style.transform = "none"; // remove gsap transforms
-    clone.style.maxWidth = "800px"; // keep layout consistent
-    clone.style.background = "#1f2937"; // dark background fix
-    document.body.appendChild(clone); // temporarily add to DOM
 
-    // Wait until all images (like graphs) are loaded
+    // ✅ Ensure full content is captured
+    clone.style.opacity = "1";
+    clone.style.transform = "none";
+    clone.style.maxWidth = "800px";
+    clone.style.background = "#1f2937";
+    clone.style.overflow = "visible";     // allow content to expand
+    clone.style.height = "auto";          // no fixed heights
+    clone.style.maxHeight = "none";       // remove height limits
+
+    document.body.appendChild(clone);
+
+    // Wait for images (graphs, logos, etc.)
     const images = clone.querySelectorAll("img");
     const promises = Array.from(images).map(img => {
         if (img.complete) return Promise.resolve();
@@ -181,15 +186,16 @@ function downloadReportAsPDF(applicantId) {
             margin: 0.2,
             filename: `RISKON_Report_${applicantId}_${applicant.personal.name.replace(/\s+/g, '_')}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, backgroundColor: "#1f2937" },
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: "#1f2937", scrollY: 0 },
             jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
             pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
         };
         html2pdf().from(clone).set(options).save().then(() => {
-            document.body.removeChild(clone); // cleanup after save
+            document.body.removeChild(clone); // cleanup
         });
     });
 }
+
 
     // --- Handle Report Generation Click ---
     window.handleGenerateReport = function(applicantId) {
